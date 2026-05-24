@@ -1,3 +1,5 @@
+import React from 'react'
+
 function App() {
   return (
     <main style={{minHeight:'100vh',background:'linear-gradient(135deg,#07111f,#0f2b3d)',color:'#ffffff',fontFamily:'Arial,Helvetica,sans-serif',padding:'40px',boxSizing:'border-box'}}>
