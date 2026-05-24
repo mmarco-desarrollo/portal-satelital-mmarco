@@ -19,6 +19,7 @@ function App() {
   const [nubosidad, setNubosidad] = useState('20')
   const [zoom, setZoom] = useState('14')
   const [activas, setActivas] = useState([])
+  const [estadoBusqueda, setEstadoBusqueda] = useState('')
 
   const parsedLat = Number.parseFloat(lat) || 40.6325
   const parsedLng = Number.parseFloat(lng) || -3.1602
@@ -32,6 +33,25 @@ function App() {
     }
     return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${parsedLng - delta},${parsedLat - delta},${parsedLng + delta},${parsedLat + delta}&bboxSR=4326&imageSR=4326&size=1400,850&format=jpg&f=image`
   }, [parsedLat, parsedLng, instanceId, capaCopernicus, nubosidad, zoom])
+
+  async function buscarLugar() {
+    const q = lugar.trim()
+    if (!q) return
+    setEstadoBusqueda('Buscando coordenadas...')
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      if (!data.length) {
+        setEstadoBusqueda('No se encontro el lugar. Prueba con provincia y pais.')
+        return
+      }
+      setLat(String(data[0].lat))
+      setLng(String(data[0].lon))
+      setEstadoBusqueda(`Encontrado: ${data[0].display_name}`)
+    } catch (error) {
+      setEstadoBusqueda('No se pudo buscar el lugar. Revisa conexion o usa coordenadas.')
+    }
+  }
 
   function toggleFiltro(id) {
     setActivas(actual => actual.includes(id) ? actual.filter(x => x !== id) : [...actual, id])
@@ -72,7 +92,14 @@ function App() {
               <label style={styles.label}>Longitud<input style={styles.input} value={lng} onChange={e => setLng(e.target.value)} /></label>
             </div>
           ) : (
-            <label style={styles.label}>Poblacion, finca o direccion<input style={styles.input} value={lugar} onChange={e => setLugar(e.target.value)} placeholder="Ej: Orea, Guadalajara" /></label>
+            <div>
+              <label style={styles.label}>Poblacion, finca o direccion<input style={styles.input} value={lugar} onChange={e => setLugar(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') buscarLugar() }} placeholder="Ej: Orea, Guadalajara, Espana" /></label>
+              <button onClick={buscarLugar} style={styles.searchButton}>Buscar lugar y actualizar imagen</button>
+              {estadoBusqueda && <p style={styles.status}>{estadoBusqueda}</p>}
+              <div style={styles.examples}>
+                {['Orea, Guadalajara, Espana','Molina de Aragon, Espana','Siguenza, Guadalajara','Doñana, Huelva','40.6325,-3.1602'].map(x => <button key={x} onClick={() => { setLugar(x); setModo('lugar') }} style={styles.example}>{x}</button>)}
+              </div>
+            </div>
           )}
 
           <label style={styles.label}>Copernicus Instance ID<input style={styles.input} value={instanceId} onChange={e => setInstanceId(e.target.value)} placeholder="Pega aqui tu INSTANCE_ID" /></label>
@@ -102,7 +129,7 @@ function App() {
         <section style={styles.visorCard}>
           <div style={styles.visor}>
             <img src={imagenUrl} alt="Imagen satelital" style={styles.imagen} onError={e => { e.currentTarget.style.display = 'none' }} />
-            <div style={styles.infoBox}><small>Zona seleccionada</small><strong>{ubicacion}</strong><span>{instanceId.trim() ? `Copernicus ${capaCopernicus}` : 'Satélite base Esri'} · Nubosidad {nubosidad}% · Zoom {zoom}</span></div>
+            <div style={styles.infoBox}><small>Zona seleccionada</small><strong>{ubicacion}</strong><span>{instanceId.trim() ? `Copernicus ${capaCopernicus}` : 'Satelite base Esri'} · Nubosidad {nubosidad}% · Zoom {zoom}</span><span>{parsedLat.toFixed(5)}, {parsedLng.toFixed(5)}</span></div>
             {filtrosActivos.map((f, i) => <div key={f.id} title={f.nombre} style={{...styles.overlay, background:f.color, borderColor:f.borde, left:`${12 + (i*13)%62}%`, top:`${22 + (i*11)%48}%`, width:`${180 + (i*40)%180}px`, height:`${90 + (i*25)%120}px`, transform:`rotate(${i*13}deg)`}}><span style={styles.overlayLabel}>{f.nombre}</span></div>)}
             {filtrosActivos.length === 0 && <div style={styles.emptyHint}>Imagen limpia. Activa capas desde el panel izquierdo.</div>}
           </div>
@@ -121,8 +148,8 @@ const styles = {
   page:{minHeight:'100vh',background:'radial-gradient(circle at top left,rgba(16,185,129,.22),transparent 32%),linear-gradient(135deg,#07111f,#0f172a)',color:'#fff',fontFamily:'Arial,Helvetica,sans-serif',padding:'24px',boxSizing:'border-box'},
   header:{display:'flex',justifyContent:'space-between',gap:'20px',alignItems:'stretch',maxWidth:'1320px',margin:'0 auto 20px',padding:'24px',border:'1px solid rgba(255,255,255,.12)',borderRadius:'28px',background:'rgba(255,255,255,.08)'},
   badge:{display:'inline-block',padding:'8px 12px',borderRadius:'999px',background:'rgba(16,185,129,.18)',color:'#a7f3d0',marginBottom:'12px'}, title:{fontSize:'42px',lineHeight:1.05,margin:'0 0 10px'}, subtitle:{margin:0,color:'#cbd5e1',fontSize:'18px'}, contacto:{minWidth:'240px',display:'grid',gap:'8px',padding:'16px',borderRadius:'20px',background:'rgba(2,6,23,.55)',color:'#dbeafe'},
-  grid:{maxWidth:'1320px',margin:'0 auto',display:'grid',gridTemplateColumns:'390px 1fr',gap:'20px'}, panel:{padding:'20px',borderRadius:'28px',background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)'}, h2:{margin:'0 0 12px',fontSize:'22px'}, tabs:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'14px'}, tab:{padding:'10px',border:0,borderRadius:'14px',background:'rgba(15,23,42,.8)',color:'#cbd5e1'}, tabActive:{padding:'10px',border:0,borderRadius:'14px',background:'#10b981',color:'#06111f',fontWeight:700}, twoCols:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}, label:{display:'grid',gap:'6px',fontSize:'13px',color:'#cbd5e1',marginBottom:'12px'}, input:{width:'100%',boxSizing:'border-box',padding:'12px',borderRadius:'14px',border:'1px solid rgba(255,255,255,.12)',background:'#020617',color:'#fff'}, filtros:{display:'grid',gap:'8px'}, filtro:{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'center',padding:'12px',borderRadius:'14px',border:'1px solid rgba(255,255,255,.12)',background:'#020617',color:'#fff',textAlign:'left'}, filtroActivo:{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'center',padding:'12px',borderRadius:'14px',border:'1px solid rgba(16,185,129,.8)',background:'rgba(16,185,129,.18)',color:'#fff',textAlign:'left'}, download:{width:'100%',marginTop:'16px',padding:'14px',border:0,borderRadius:'16px',background:'#3b82f6',color:'#fff',fontWeight:700,fontSize:'16px'},
-  visorCard:{display:'grid',gap:'20px'}, visor:{position:'relative',height:'520px',overflow:'hidden',borderRadius:'28px',border:'1px solid rgba(255,255,255,.12)',background:'#111827'}, imagen:{width:'100%',height:'100%',objectFit:'cover',display:'block'}, infoBox:{position:'absolute',top:'18px',left:'18px',display:'grid',gap:'6px',padding:'16px 18px',borderRadius:'18px',background:'rgba(2,6,23,.82)',backdropFilter:'blur(10px)',boxShadow:'0 20px 60px rgba(0,0,0,.35)'}, overlay:{position:'absolute',border:'2px solid',borderRadius:'50%',boxShadow:'0 0 30px rgba(0,0,0,.22)'}, overlayLabel:{position:'absolute',left:'14px',top:'-34px',whiteSpace:'nowrap',padding:'7px 10px',borderRadius:'999px',background:'rgba(2,6,23,.82)',fontSize:'13px'}, emptyHint:{position:'absolute',right:'18px',bottom:'18px',padding:'14px 16px',borderRadius:'18px',background:'rgba(2,6,23,.75)',color:'#cbd5e1'}, resultados:{padding:'20px',borderRadius:'28px',background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)'}, muted:{color:'#cbd5e1'}, resultado:{padding:'14px',borderRadius:'18px',background:'rgba(2,6,23,.5)',marginBottom:'10px'},
+  grid:{maxWidth:'1320px',margin:'0 auto',display:'grid',gridTemplateColumns:'390px 1fr',gap:'20px'}, panel:{padding:'20px',borderRadius:'28px',background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)'}, h2:{margin:'0 0 12px',fontSize:'22px'}, tabs:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'14px'}, tab:{padding:'10px',border:0,borderRadius:'14px',background:'rgba(15,23,42,.8)',color:'#cbd5e1'}, tabActive:{padding:'10px',border:0,borderRadius:'14px',background:'#10b981',color:'#06111f',fontWeight:700}, twoCols:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}, label:{display:'grid',gap:'6px',fontSize:'13px',color:'#cbd5e1',marginBottom:'12px'}, input:{width:'100%',boxSizing:'border-box',padding:'12px',borderRadius:'14px',border:'1px solid rgba(255,255,255,.12)',background:'#020617',color:'#fff'}, searchButton:{width:'100%',padding:'12px',border:0,borderRadius:'14px',background:'#10b981',color:'#06111f',fontWeight:700,marginBottom:'8px'}, status:{fontSize:'12px',color:'#dbeafe',lineHeight:1.35,margin:'6px 0 10px'}, examples:{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}, example:{padding:'6px 8px',borderRadius:'999px',border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.06)',color:'#cbd5e1',fontSize:'11px'}, filtros:{display:'grid',gap:'8px'}, filtro:{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'center',padding:'12px',borderRadius:'14px',border:'1px solid rgba(255,255,255,.12)',background:'#020617',color:'#fff',textAlign:'left'}, filtroActivo:{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'center',padding:'12px',borderRadius:'14px',border:'1px solid rgba(16,185,129,.8)',background:'rgba(16,185,129,.18)',color:'#fff',textAlign:'left'}, download:{width:'100%',marginTop:'16px',padding:'14px',border:0,borderRadius:'16px',background:'#3b82f6',color:'#fff',fontWeight:700,fontSize:'16px'},
+  visorCard:{display:'grid',gap:'20px'}, visor:{position:'relative',height:'520px',overflow:'hidden',borderRadius:'28px',border:'1px solid rgba(255,255,255,.12)',background:'#111827'}, imagen:{width:'100%',height:'100%',objectFit:'cover',display:'block'}, infoBox:{position:'absolute',top:'18px',left:'18px',display:'grid',gap:'6px',padding:'16px 18px',borderRadius:'18px',background:'rgba(2,6,23,.82)',backdropFilter:'blur(10px)',boxShadow:'0 20px 60px rgba(0,0,0,.35)'}, overlay:{position:'absolute',border:'2px solid',borderRadius:'50%',boxShadow:'0 0 30px rgba(0,0,0,.22)'}, overlayLabel:{position:'absolute',left:'14px',top:'-34px',whiteSpace:'nowrap',padding:'7px 10px',borderRadius:'999px',background:'rgba(2,6,23,.82)',fontSize:'13px'}, emptyHint:{position:'absolute',right:'18px',bottom:'18px',padding:'14px 16px',borderRadius:'18px',background:'rgba(2,6,23,.75)',color:'#cbd5e1'}, resultados:{padding:'20px',borderRadius:'28px',background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)'}, muted:{color:'#cbd5e1'}, resultado:{padding:'14px',borderRadius:'18px',background:'rgba(2,6,23,.5)',marginBottom:'10px'}
 }
 
 export default App
